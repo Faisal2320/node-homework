@@ -3,6 +3,10 @@ const app = express();
 const errorHandler = require("./middleware/error-handler");
 const notFound = require("./middleware/not-found");
 const { StatusCodes } = require("http-status-codes");
+const userRouter = require("./routes/userRoutes");
+global.user_id = null;
+global.users = [];
+global.tasks = [];
 /*
 
 
@@ -26,14 +30,22 @@ app.use((req, res, next) => {
 //
 //
 app.get("/", (req, res) => {
-  res.send("Hello World!");
+  res.json({ message: "Hello World!" });
 });
 //
 //
 app.post("/testpost", (req, res) => {
-  res.status(StatusCodes.OK).send("Request received.");
+  res.status(StatusCodes.OK).json({ message: "Request received." });
 });
+//
+//
+// =================  User
+//
+// app.post("/api/users/register", register);
+app.use(express.json({ limit: "1kb" }));
+app.use("/api/users", userRouter);
 
+// 404 route
 app.use(notFound);
 app.use(errorHandler);
 
@@ -50,6 +62,13 @@ const server = app.listen(port, () => {
   console.log(`To visit click on Ctr + http://localhost:${port}`);
 });
 /*
+
+
+
+
+
+
+
 
 
 
