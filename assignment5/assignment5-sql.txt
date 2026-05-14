@@ -27,7 +27,7 @@ JOIN (
     GROUP BY o.customer_id, o.order_id
 ) AS t
     ON c.customer_id = t.customer_id
-GROUP BY c.customer_name
+GROUP BY c.customer_id, c.customer_name
 ORDER BY c.customer_name;
 #----------------------------------------------------
 SELECT customer_id from customers where customer_name = 'Perez and Sons';
@@ -36,13 +36,19 @@ select product_id from products ORDER BY price ASC limit 5;
 
 BEGIN;
 INSERT INTO orders (customer_id, employee_id, date) 
-VALUES (16,7,CURRENT_DATE) returning order_id;
+VALUES (16,7,CURRENT_DATE) returning order_id \gset;
+
 
 INSERT INTO line_items (order_id, product_id, quantity)
-values (256,23,1),(256,18,3),(256,43,5),(256,9,15),(256,44,1);
+values
+ (:order_id,23,1),
+ (:order_id,18,3),
+ (:order_id,43,5),
+ (:order_id,9,15),
+ (:order_id,44,1);
 COMMIT;
 
-SELECT * from line_items where order_id = 252;
+SELECT * from line_items where order_id = :order_id;
 #--------------------------------------------------------------
 SELECT first_name, last_name, count(o.order_id) as order_count 
 FROM employees as e 
