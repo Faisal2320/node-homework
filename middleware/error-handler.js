@@ -7,6 +7,9 @@ const errorHandlerMiddleware = (err, req, res, next) => {
       "The database connection was refused. Is your database service running?",
     );
   }
+  if (err.name === "PrismaClientInitializationError") {
+    console.error("Couldn't connect to the database. is it running?");
+  }
   console.error(
     "Internal server error: ",
     err.constructor.name,
@@ -19,10 +22,4 @@ const errorHandlerMiddleware = (err, req, res, next) => {
   }
 };
 
-/*
-
-
-
-
-*/
 module.exports = errorHandlerMiddleware;
