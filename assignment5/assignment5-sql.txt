@@ -1,0 +1,63 @@
+SELECT 
+    orders.order_id, 
+    SUM(products.price * line_items.quantity) AS total_price 
+FROM orders 
+JOIN line_items 
+    ON orders.order_id = line_items.order_id 
+JOIN products 
+    ON line_items.product_id = products.product_id 
+GROUP BY orders.order_id 
+ORDER BY orders.order_id 
+LIMIT 5; 
+# ---------------------------------------------------
+SELECT
+    c.customer_name,
+    AVG(t.total_price) AS average_order_price
+FROM customers c
+JOIN (
+    SELECT
+        o.customer_id,
+        o.order_id,
+        SUM(p.price * l.quantity) AS total_price
+    FROM orders o
+    JOIN line_items l
+        ON o.order_id = l.order_id
+    JOIN products p
+        ON l.product_id = p.product_id
+    GROUP BY o.customer_id, o.order_id
+) AS t
+    ON c.customer_id = t.customer_id
+GROUP BY c.customer_id, c.customer_name
+ORDER BY c.customer_name;
+#----------------------------------------------------
+SELECT customer_id from customers where customer_name = 'Perez and Sons';
+SELECT employee_id from employees e where first_name = 'Miranda' and last_name = 'Harris';
+select product_id from products ORDER BY price ASC limit 5;
+
+BEGIN;
+INSERT INTO orders (customer_id, employee_id, date) 
+VALUES (16,7,CURRENT_DATE) returning order_id;
+
+
+INSERT INTO line_items (order_id, product_id, quantity)
+values
+ ($1,23,10),
+ ($1,18,10),
+ ($1,43,10),
+ ($1,9,10),
+ ($1,44,10);
+COMMIT;
+
+SELECT * from line_items where order_id = $1;
+#--------------------------------------------------------------
+SELECT first_name, last_name, count(o.order_id) as order_count 
+FROM employees as e 
+JOIN orders as o 
+on e.employee_id = o.employee_id 
+GROUP BY e.employee_id, first_name, last_name 
+HAVING count(o.order_id) > 5 
+order by e.last_name; 
+
+#--------------------------------------------------------------
+
+

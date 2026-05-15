@@ -6,24 +6,9 @@ const { StatusCodes } = require("http-status-codes");
 const userRouter = require("./routes/userRoutes");
 const authMiddleware = require("./middleware/auth");
 const taskRouter = require("./routes/taskRoutes");
-global.user_id = null;
-/*
-structure of use_id: 
-{
-    "name":"Faisal",
-    "email": "example@verizon.net",
-    "password": "1235"
-}
-*/
+global.userId = null;
 global.users = [];
 global.tasks = [];
-/* Structure of tasks
-{
-  id:int,
-  userId:email,
-    ...req.task
-  }
-*/
 app.use((req, res, next) => {
   console.log(
     "method: ",
@@ -38,21 +23,24 @@ app.use((req, res, next) => {
 
   next();
 });
-//
-//
+app.get("/health", async (req, res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.json({ status: "OK", db: "connected" });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: `DB not connected, error: ${err.message}` });
+  }
+});
 app.get("/", (req, res) => {
   res.json({ message: "Hello World!" });
 });
-//
-//
+
 app.post("/testpost", (req, res) => {
   res.status(StatusCodes.OK).json({ message: "Request received." });
 });
-//
-//
 // =================  User
-//
-// app.post("/api/users/register", register);
 app.use(express.json({ limit: "1kb" }));
 app.use("/api/users", userRouter);
 app.use("/api/tasks", authMiddleware, taskRouter);
@@ -60,10 +48,7 @@ app.use("/api/tasks", authMiddleware, taskRouter);
 // 404 route
 app.use(notFound);
 app.use(errorHandler);
-
 /*
-
-
 
 
 
@@ -77,17 +62,6 @@ const server = app.listen(port, () => {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 */
 server.on("error", (err) => {
   if (err.code === "EADDRINUSE") {
@@ -97,6 +71,8 @@ server.on("error", (err) => {
   }
 });
 let isShuttingDown = false;
+// for database shutdown
+const pool = require("./db/pg-pool");
 
 async function shutdown(code = 0) {
   if (isShuttingDown) return;
@@ -104,6 +80,8 @@ async function shutdown(code = 0) {
   console.log("Shutting down gracefully...");
   try {
     await new Promise((resolve) => server.close(resolve));
+    // shutdown database
+    await pool.end();
     console.log("HTTP server closed.");
   } catch (err) {
     console.log("Error during shutdown: ", err);

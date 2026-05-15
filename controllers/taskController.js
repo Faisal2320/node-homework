@@ -1,118 +1,131 @@
 const { StatusCodes } = require("http-status-codes");
 const { taskSchema, patchTaskSchema } = require("../validation/taskSchema");
-// counter for task
-const taskCounter = (() => {
-  let lastTaskNumber = 0;
-  return () => {
-    lastTaskNumber += 1;
-    return lastTaskNumber;
-  };
-})();
+const pool = require("../db/pg-pool");
+//
 function sanitize(task) {
-  const { userId, ...rest } = task;
-  userId;
+  const { user_id, ...rest } = task;
+  user_id;
   return rest;
 }
 //
-function index(req, res) {
-  const userTasks = global.tasks.filter((task) => {
-    return task.userId === global.user_id.email;
-  });
-  if (userTasks.length === 0) {
+async function index(req, res) {
+  const tasks = await pool.query(
+    `SELECT id, title, is_completed FROM tasks WHERE user_id = $1`,
+    [global.user_id],
+  );
+  console.log(tasks.rows);
+  if (tasks.rows.length === 0) {
     return res
       .status(StatusCodes.NOT_FOUND)
       .json({ message: "No tasks found" });
   }
-  const sanitizedTask = userTasks.map(sanitize);
 
-  return res.status(StatusCodes.OK).json(sanitizedTask);
+  return res.status(StatusCodes.OK).json(tasks.rows);
 }
-function create(req, res) {
+async function create(req, res) {
+  if (!global.user_id) {
+    return res
+      .status(StatusCodes.UNAUTHORIZED)
+      .json({ message: "Not logged in" });
+  }
   // create new task
   if (!req.body) req.body = {};
   const { error, value } = taskSchema.validate({ ...req.body });
   if (error) {
     return res.status(StatusCodes.BAD_REQUEST).json(error);
   }
-  console.log("Create called: ", req.body);
-  const newTask = {
-    ...value,
-    id: taskCounter(),
-    userId: global.user_id.email,
-  };
-  //   push the task to global task array
-  global.tasks.push(newTask);
-  // remove the user_id and send back the task and everyting
-  res.status(StatusCodes.CREATED).json(sanitize(newTask));
+  const task = await pool.query(
+    `INSERT INTO tasks (title, is_completed, user_id) 
+    VALUES ($1,$2,$3) RETURNING id,title,is_completed`,
+    [value.title, value.isCompleted ?? false, global.user_id],
+  );
+
+  res.status(StatusCodes.CREATED).json({ ...task.rows[0] });
 }
-function show(req, res) {
+async function show(req, res) {
   const taskId = parseInt(req.params?.id);
+
   if (isNaN(taskId)) {
     return res
       .status(StatusCodes.BAD_REQUEST)
       .json({ message: "Invalid Task ID" });
   }
-  const taskIndex = global.tasks.findIndex((task) => {
-    return task.id === taskId && task.userId === global.user_id.email;
-  });
-  if (taskIndex === -1) {
+  const task = await pool.query(
+    `SELECT * FROM tasks WHERE id = $1 AND user_id = $2`,
+    [taskId, global.user_id],
+  );
+  if (task.rows.length !== 1) {
     return res
       .status(StatusCodes.NOT_FOUND)
       .json({ message: "Task ID not found" });
   }
-  const sanitizedTask = sanitize(global.tasks[taskIndex]);
-  res.status(StatusCodes.OK).json(sanitizedTask);
+  res.status(StatusCodes.OK).json(sanitize(task.rows[0]));
 }
-function update(req, res) {
+async function update(req, res) {
   const taskId = parseInt(req.params?.id);
   if (isNaN(taskId)) {
     return res
-      .status(StatusCodes.NOT_FOUND)
+      .status(StatusCodes.BAD_REQUEST)
       .json({ message: "The task ID is not valid" });
   }
-  //   check if the user is logged in and it is its own task
-  const taskIndex = global.tasks.findIndex((task) => {
-    return task.id === taskId && task.userId === global.user_id.email;
-  });
-  if (taskIndex === -1) {
-    return res
-      .status(StatusCodes.NOT_FOUND)
-      .json({ message: "Task not found" });
-  }
-
-  const currentTask = global.tasks[taskIndex];
-  //   validate the req.body
   const { error, value } = patchTaskSchema.validate({ ...req.body });
   if (error) {
     return res.status(StatusCodes.BAD_REQUEST).json(error);
   }
-  Object.assign(currentTask, value);
-  res.status(StatusCodes.OK).json(sanitize(currentTask));
-}
-function deleteTask(req, res) {
-  // if there is id in params we get that from req.params
-  const currentTask = parseInt(req.params?.id);
-  if (isNaN(currentTask)) {
-    return res.status(400).json({ message: "The task ID is not valid." });
-  }
-  //    now find that id int from params in tasks array
-  const taskIndex = global.tasks.findIndex((task) => {
-    // checks every tasks id to params.id and if that this user is loggedin or not
-    return task.id === currentTask && task.userId === global.user_id.email;
+
+  let keys = Object.keys(value);
+  keys = keys.map((key) => {
+    return key === "isCompleted" ? "is_completed" : key;
   });
-  //   if not found 404
-  if (taskIndex === -1) {
+  const setClauses = keys.map((key, i) => `${key} = $${i + 1}`).join(", ");
+  const idParm = `$${keys.length + 1}`;
+  const userParm = `$${keys.length + 2}`;
+  const result = await pool.query(
+    `UPDATE tasks SET ${setClauses}
+    WHERE id = ${idParm} AND user_id = ${userParm}
+    RETURNING id, title, is_completed`,
+    [...Object.values(value), taskId, global.user_id],
+  );
+
+  if (result.rows.length !== 1) {
     return res
       .status(StatusCodes.NOT_FOUND)
-      .json({ message: "That task was not found" });
+      .json({ message: "Task not found" });
   }
-  //   pull out that task by inserting index in global.task array
-  //    so that we can send it back in res. as a success message
-  // destructure it and take out only the task and not userId
-  const sanitizedTask = sanitize(global.tasks[taskIndex]);
-  //   remove the task from global task array
-  global.tasks.splice(taskIndex, 1);
-  return res.json(sanitizedTask);
+  res.status(StatusCodes.OK).json(result.rows[0]);
+}
+async function deleteTask(req, res) {
+  // if there is id in params we get that from req.params
+  const taskId = parseInt(req.params?.id);
+  if (isNaN(taskId)) {
+    return res
+      .status(StatusCodes.BAD_REQUEST)
+      .json({ message: "The task ID is not valid." });
+  }
+  //    now find that id int from params in tasks array
+  const task = await pool.query(`SELECT * FROM tasks WHERE id = $1`, [taskId]);
+  if (task.rows.length !== 1) {
+    return res
+      .status(StatusCodes.NOT_FOUND)
+      .json({ message: `The task for the id ${taskId} not found` });
+  }
+  if (task.rows[0].user_id !== global.user_id) {
+    return res
+      .status(StatusCodes.NOT_FOUND)
+      .json({ message: "Task not found" });
+  }
+  const deletedTask = await pool.query(
+    `DELETE FROM tasks WHERE id = $1 AND user_id = $2 
+     RETURNING id,title,is_completed`,
+    [taskId, global.user_id],
+  );
+  //   if not found 404
+  if (deletedTask.rows.length !== 1) {
+    return res
+      .status(StatusCodes.NOT_FOUND)
+      .json({ message: "Task not found" });
+  }
+  return res.json(deletedTask.rows[0]);
 }
 
 module.exports = { index, create, show, update, deleteTask };
