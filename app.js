@@ -6,6 +6,7 @@ const { StatusCodes } = require("http-status-codes");
 const userRouter = require("./routes/userRoutes");
 const authMiddleware = require("./middleware/auth");
 const taskRouter = require("./routes/taskRoutes");
+const prisma = require("./db/prisma");
 global.userId = null;
 global.users = [];
 global.tasks = [];
@@ -25,7 +26,7 @@ app.use((req, res, next) => {
 });
 app.get("/health", async (req, res) => {
   try {
-    await pool.query("SELECT 1");
+    await prisma.$queryRaw`SELECT 1`;
     res.json({ status: "OK", db: "connected" });
   } catch (err) {
     res
@@ -72,7 +73,6 @@ server.on("error", (err) => {
 });
 let isShuttingDown = false;
 // for database shutdown
-const pool = require("./db/pg-pool");
 
 async function shutdown(code = 0) {
   if (isShuttingDown) return;
@@ -81,7 +81,8 @@ async function shutdown(code = 0) {
   try {
     await new Promise((resolve) => server.close(resolve));
     // shutdown database
-    await pool.end();
+    await prisma.$disconnect();
+    console.log("Prisma disconnected");
     console.log("HTTP server closed.");
   } catch (err) {
     console.log("Error during shutdown: ", err);
