@@ -5,11 +5,29 @@ const util = require("util");
 const scrypt = util.promisify(crypto.scrypt);
 // const pool = require("../db/pg-pool");
 const prisma = require("../db/prisma");
+const { randomUUID } = require("crypto");
+const jwt = require("jsonwebtoken");
 /*
 
 
 
 */
+const cookieFlags = (req) => {
+  req;
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "Strict",
+  };
+};
+
+const setJwtCookie = (req, res, user) => {
+  const payload = { id: user.id, csrfToken: randomUUID() };
+  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "1h" });
+  res.cookie("jwt", token, { ...cookieFlags(req), maxAge: 3600000 });
+  return payload.csrfToken;
+};
+
 async function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
   const derivedKey = await scrypt(password, salt, 64);
@@ -81,10 +99,12 @@ const register = async (req, res, next) => {
       });
       return { newUser, welcomeTask };
     });
-    global.user_id = result.newUser.id;
+    const csrfToken = setJwtCookie(req, res, result.newUser);
+
     return res.status(201).json({
       user: result.newUser,
       welcomeTasks: result.welcomeTask,
+      csrfToken,
       transactionStatus: "success",
     });
   } catch (e) {
@@ -116,18 +136,18 @@ const logon = async (req, res) => {
   }
   //
   //
+  const csrfToken = setJwtCookie(req, res, user);
 
-  global.user_id = user.id;
-  console.log("Logged in user: ", global.user_id);
+  console.log("Logged in user: ", user.id);
   return res.status(StatusCodes.OK).json({
-    id: user.id,
     name: user.name,
     email: user.email,
+    csrfToken,
   });
 };
 // ============================ Logoff
 const logoff = (req, res) => {
-  global.user_id = null;
+  res.clearCookie("jwt", cookieFlags(req));
   return res.sendStatus(StatusCodes.OK);
 };
 

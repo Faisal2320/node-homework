@@ -6,24 +6,29 @@ const { StatusCodes } = require("http-status-codes");
 const userRoutes = require("./routes/userRoutes");
 const taskRoutes = require("./routes/taskRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
-const authMiddleware = require("./middleware/auth");
+// const authMiddleware = require("./middleware/auth");
+const jwtMiddleware = require("./middleware/jwtMiddleware");
+const cookieParser = require("cookie-parser");
+// ==============
+app.set("trust proxy", 1);
+const helmet = require("helmet");
+const { xss } = require("express-xss-sanitizer");
+const rateLimiter = require("express-rate-limit");
 
 const prisma = require("./db/prisma");
-global.userId = null;
-global.users = [];
-global.tasks = [];
+
+app.use(rateLimiter({ windowMs: 15 * 60 * 1000, max: 100 }));
+app.use(helmet());
+
 app.use((req, res, next) => {
   console.log(
     "method: ",
     req.method,
-    "\n",
-    "path: ",
+    "\n path: ",
     req.path,
-    "\n",
-    "query:",
+    "\n query:",
     req.query,
   );
-
   next();
 });
 app.get("/health", async (req, res) => {
@@ -44,10 +49,12 @@ app.post("/testpost", (req, res) => {
   res.status(StatusCodes.OK).json({ message: "Request received." });
 });
 // =================  User
+app.use(cookieParser());
 app.use(express.json({ limit: "1kb" }));
-app.use("/api/tasks", authMiddleware, taskRoutes);
+app.use(xss());
+app.use("/api/tasks", jwtMiddleware, taskRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/analytics", authMiddleware, analyticsRoutes);
+app.use("/api/analytics", jwtMiddleware, analyticsRoutes);
 
 // 404 route
 app.use(notFound);
