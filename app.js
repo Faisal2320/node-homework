@@ -3,9 +3,11 @@ const app = express();
 const errorHandler = require("./middleware/error-handler");
 const notFound = require("./middleware/not-found");
 const { StatusCodes } = require("http-status-codes");
-const userRouter = require("./routes/userRoutes");
+const userRoutes = require("./routes/userRoutes");
+const taskRoutes = require("./routes/taskRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
 const authMiddleware = require("./middleware/auth");
-const taskRouter = require("./routes/taskRoutes");
+
 const prisma = require("./db/prisma");
 global.userId = null;
 global.users = [];
@@ -43,8 +45,9 @@ app.post("/testpost", (req, res) => {
 });
 // =================  User
 app.use(express.json({ limit: "1kb" }));
-app.use("/api/users", userRouter);
-app.use("/api/tasks", authMiddleware, taskRouter);
+app.use("/api/tasks", authMiddleware, taskRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/analytics", authMiddleware, analyticsRoutes);
 
 // 404 route
 app.use(notFound);
