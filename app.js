@@ -9,6 +9,7 @@ const analyticsRoutes = require("./routes/analyticsRoutes");
 // const authMiddleware = require("./middleware/auth");
 const jwtMiddleware = require("./middleware/jwtMiddleware");
 const cookieParser = require("cookie-parser");
+const cors = require("cors");
 // ==============
 app.set("trust proxy", 1);
 const helmet = require("helmet");
@@ -20,6 +21,15 @@ const prisma = require("./db/prisma");
 app.use(rateLimiter({ windowMs: 15 * 60 * 1000, max: 100 }));
 app.use(helmet());
 
+const origins = ["http://localhost:3001"];
+app.use(
+  cors({
+    origin: origins,
+    credentials: true,
+    methods: "GET,POST,PATCH,PUT,DELETE",
+    allowedHeaders: "CONTENT-TYPE, X-CSRF-TOKEN",
+  }),
+);
 app.use((req, res, next) => {
   console.log(
     "method: ",

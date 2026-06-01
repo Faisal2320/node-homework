@@ -13,11 +13,13 @@ const jwt = require("jsonwebtoken");
 
 */
 const cookieFlags = (req) => {
-  req;
   return {
+    ...(process.env.NODE_ENV === "production" && {
+      domain: req.hostname,
+    }),
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "Strict",
+    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
   };
 };
 
