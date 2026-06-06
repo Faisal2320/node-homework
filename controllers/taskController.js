@@ -36,7 +36,7 @@ async function index(req, res) {
   const skip = (page - 1) * limit;
   const { find, isCompleted, priority, min_date, max_date } = req.query;
 
-  const userId = global.user_id;
+  const userId = req.user.id;
 
   if (!userId) {
     return res.status(401).json({ message: "Not Logged in" });
@@ -109,7 +109,7 @@ async function create(req, res) {
       title: value.title,
       isCompleted: value.isCompleted ?? false,
       priority: value.priority,
-      userId: global.user_id,
+      userId: req.user.id,
     },
     select: { id: true, title: true, isCompleted: true, priority: true },
   });
@@ -138,7 +138,7 @@ async function show(req, res, next) {
         User: { select: { name: true, email: true } },
       },
     });
-    if (task.userId !== global.user_id) {
+    if (task.userId !== req.user.id) {
       return res.status(StatusCodes.NOT_FOUND).json({
         message: `Task with the id ${taskId} not found for the current user`,
       });
@@ -170,7 +170,7 @@ async function update(req, res, next) {
       data: value,
       where: {
         id: taskId,
-        userId: global.user_id,
+        userId: req.user.id,
       },
       select: { id: true, title: true, isCompleted: true, priority: true },
     });
@@ -198,7 +198,7 @@ async function deleteTask(req, res, next) {
     await prisma.task.delete({
       where: {
         id: taskId,
-        userId: global.user_id,
+        userId: req.user.id,
       },
       select: {
         id: true,
@@ -242,7 +242,7 @@ const bulkCreate = async (req, res, next) => {
       title: value.title,
       isCompleted: value.isCompleted || false,
       priority: value.priority || "medium",
-      userId: global.user_id,
+      userId: req.user.id,
     });
   }
 
