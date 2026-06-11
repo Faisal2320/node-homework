@@ -60,7 +60,7 @@ app.post("/testpost", (req, res) => {
 });
 // =================  User
 app.use(cookieParser());
-app.use(express.json({ limit: "1kb" }));
+app.use(express.json({ limit: "1mb" }));
 app.use(xss());
 app.use("/api/tasks", jwtMiddleware, taskRoutes);
 app.use("/api/users", userRoutes);

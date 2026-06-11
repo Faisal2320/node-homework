@@ -37,7 +37,6 @@ async function index(req, res) {
   const { find, isCompleted, priority, min_date, max_date } = req.query;
 
   const userId = req.user.id;
-
   if (!userId) {
     return res.status(401).json({ message: "Not Logged in" });
   }
