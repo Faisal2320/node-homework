@@ -31,7 +31,10 @@ describe("register a user", () => {
       email: "jdeere@example.com",
       password: "Pa$$word20",
     };
-    saveRes = await agent.post(registerUrl).send(newUser);
+    saveRes = await agent
+      .post(registerUrl)
+      .set("X-Recaptcha-Test", process.env.RECAPTCHA_BYPASS)
+      .send(newUser);
     expect(saveRes.status).toBe(201);
   });
   it("47. Registration returns an object with the expected name", () => {
@@ -49,20 +52,16 @@ describe("register a user", () => {
   });
   it("50. Logged in user can access /api/tasks", async () => {
     const res = await agent.get(tasksUrl);
-    console.log("50. Response: ", res.body);
     expect(res.status).not.toBe(401);
   });
   it("51. User can log out", async () => {
     saveRes = await agent
       .post(logoffUrl)
       .set("X-CSRF-TOKEN", saveRes.body.csrfToken);
-    // console.log("51. headers: ", saveRes.headers["set-cookie"]);
     expect(saveRes.status).toBe(200);
   });
   it("52. After logoff, /api/tasks returns 401", async () => {
     saveRes = await agent.get(tasksUrl);
-    // console.log("52. Status Code: ", saveRes.status);
-    // console.log("52. Body: ", saveRes.body);
     expect(saveRes.status).toBe(401);
   });
 });
