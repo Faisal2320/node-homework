@@ -10,7 +10,9 @@ const analyticsRoutes = require("./routes/analyticsRoutes");
 const jwtMiddleware = require("./middleware/jwtMiddleware");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
-// ==============
+
+// ==========================================
+
 app.set("trust proxy", 1);
 const helmet = require("helmet");
 const { xss } = require("express-xss-sanitizer");
@@ -21,6 +23,34 @@ const prisma = require("./db/prisma");
 app.use(rateLimiter({ windowMs: 15 * 60 * 1000, max: 100 }));
 app.use(helmet());
 
+// ============== swagger ===================
+const swaggerUi = require("swagger-ui-express");
+const swaggerJsdoc = require("swagger-jsdoc");
+const { type } = require("./validation/querySchema");
+const swaggerSpec = swaggerJsdoc({
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "Task Management API",
+      version: "1.0.0",
+      description: "Node.js Express, Prisma Task Management API",
+    },
+    components: {
+      securitySchemas: {
+        cookiesAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "jwt",
+        },
+      },
+    },
+  },
+  apis: ["./routes/*.js"],
+});
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// ==========================================
 const origins = ["http://localhost:3001"];
 app.use(
   cors({
