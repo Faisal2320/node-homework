@@ -24,23 +24,102 @@ app.use(rateLimiter({ windowMs: 15 * 60 * 1000, max: 100 }));
 app.use(helmet());
 
 // ============== swagger ===================
+// const bodyParser = require("body-parser");
 const swaggerUi = require("swagger-ui-express");
 const swaggerJsdoc = require("swagger-jsdoc");
-const { type } = require("./validation/querySchema");
+
 const swaggerSpec = swaggerJsdoc({
   definition: {
     openapi: "3.0.0",
     info: {
       title: "Task Management API",
       version: "1.0.0",
-      description: "Node.js Express, Prisma Task Management API",
+      description: `
+Task Management API
+
+**Demo Mode**  
+You can try protected endpoints without login using the **Authorize** button.
+
+- Click **Authorize** (top right)
+- Paste: \`demo-token-12345\`
+- Then click **Try it out** on any endpoint
+      `,
     },
+    tags: [
+      { name: "Users", description: "User management" },
+      { name: "Tasks", description: "Task operations" },
+      { name: "Analytics", description: "Analytics and statistics" },
+    ],
+    servers: [
+      {
+        url: "https://node-homework-2320.onrender.com",
+        description: "Production",
+      },
+      { url: "http://localhost:3000", description: "Local" },
+    ],
     components: {
-      securitySchemas: {
-        cookiesAuth: {
+      securitySchemes: {
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+          description: "Use 'demo-token-12345' for demo mode",
+        },
+        cookieAuth: {
           type: "apiKey",
           in: "cookie",
           name: "jwt",
+        },
+      },
+      schemas: {
+        User: {
+          type: "object",
+          properties: {
+            id: { type: "integer" },
+            name: { type: "string" },
+            email: { type: "string", format: "email" },
+            createdAt: { type: "string", format: "date-time" },
+          },
+        },
+        Task: {
+          type: "object",
+          required: ["title"],
+          properties: {
+            id: { type: "integer" },
+            title: { type: "string" },
+            isCompleted: { type: "boolean", default: false },
+            priority: { type: "string", enum: ["low", "medium", "high"] },
+            createdAt: { type: "string", format: "date-time" },
+            userId: { type: "integer" },
+          },
+          example: {
+            id: 42,
+            title: "Finish documentation",
+            isCompleted: false,
+            priority: "high",
+            createdAt: "2025-06-16T13:24:00Z",
+          },
+        },
+        TaskStats: {
+          type: "object",
+          properties: {
+            isCompleted: { type: "boolean" },
+            _count: {
+              type: "object",
+              properties: { id: { type: "integer" } },
+            },
+          },
+        },
+        Pagination: {
+          type: "object",
+          properties: {
+            page: { type: "integer" },
+            limit: { type: "integer" },
+            total: { type: "integer" },
+            pages: { type: "integer" },
+            hasNext: { type: "boolean" },
+            hasPrev: { type: "boolean" },
+          },
         },
       },
     },
@@ -48,7 +127,21 @@ const swaggerSpec = swaggerJsdoc({
   apis: ["./routes/*.js"],
 });
 
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    swaggerOptions: {
+      persistAuthorization: true,
+      withCredentials: true,
+    },
+  }),
+);
+
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Credentials", "true");
+  next();
+});
 
 // ==========================================
 const origins = ["http://localhost:3001"];
